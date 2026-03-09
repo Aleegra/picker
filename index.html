@@ -108,7 +108,7 @@
   }
 
   button {
-    margin-top: 100px; padding: 12px 30px;
+    margin: 0; padding: 12px 30px;
     font-size: 1.1rem; font-weight: bold;
     background: #2ed573; color: white; border: none;
     border-radius: 25px; cursor: pointer;
@@ -118,17 +118,25 @@
   button:disabled { background: #ccc; box-shadow: 0 5px 0 #999; cursor: not-allowed; }
 
   #upload-btn {
-    margin-top: 20px; background: #0984e3; box-shadow: 0 5px 0 #0770c9;
+    background: #0984e3; box-shadow: 0 5px 0 #0770c9;
   }
   #upload-btn:active { box-shadow: 0 0 0 #0770c9; }
 
   #reset-btn {
-    margin-top: 20px; background: #e17055; box-shadow: 0 5px 0 #d63031;
+    background: #e17055; box-shadow: 0 5px 0 #d63031;
   }
   #reset-btn:active { box-shadow: 0 0 0 #d63031; }
 
   #file-input {
     display: none;
+  }
+
+  .button-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 100px;
+    gap: 10px;
   }
 
   /* =========================================
@@ -210,9 +218,11 @@
     <div class="result-reveal" id="result">✨ Winner! ✨</div>
   </div>
 
-  <button id="spin-btn">Pick Random Name</button>
-  <button id="upload-btn">Upload Names List</button>
-  <button id="reset-btn">Reset Names</button>
+  <div class="button-container">
+    <button id="upload-btn">Upload Names List</button>
+    <button id="spin-btn">Pick Random Name</button>
+    <button id="reset-btn">Reset Names</button>
+  </div>
   <input type="file" id="file-input" accept=".txt,.json,.csv,.xlsx">
 
 <script>
@@ -383,5 +393,4 @@
 </script>
 
 </body>
-
 </html>
