@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  :root {
+    --primary: #ff4757;
+    --bg: #f1f2f6;
+  }
+
+  body {
+    display: flex; flex-direction: column; align-items: center;
+    font-family: system-ui, sans-serif; background: var(--bg);
+    margin-top: 50px;
+  }
+
+  /* --- Machine Layout --- */
+  .machine {
+    position: relative;
+    width: 250px; height: 350px;
+    display: flex; flex-direction: column; align-items: center;
+  }
+
+  .dome {
+    width: 200px; height: 200px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 4px solid #dfe4ea;
+    border-radius: 50%;
+    position: relative;
+    overflow: hidden;
+    z-index: 2;
+    box-shadow: inset -10px -10px 20px rgba(0,0,0,0.05);
+  }
+
+  /* Capsules inside the machine */
+  .capsule {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, var(--color) 50%, #fff 50%);
+    border-radius: 50%;
+    position: absolute;
+    border: 2px solid #333;
+    /* Hardware acceleration */
+    will-change: transform; 
+  }
+
+  .base {
+    width: 220px; height: 150px;
+    background: var(--primary);
+    border-radius: 20px 20px 10px 10px;
+    position: relative;
+    z-index: 3;
+    margin-top: -20px;
+    box-shadow: 0 10px 15px rgba(0,0,0,0.1);
+  }
+
+  .handle-container {
+    width: 60px; height: 60px;
+    background: #dfe4ea;
+    border-radius: 50%;
+    position: absolute; top: 30px; left: 50%;
+    transform: translateX(-50%);
+    display: flex; justify-content: center; align-items: center;
+  }
+
+  .handle {
+    width: 40px; height: 10px;
+    background: #333;
+    border-radius: 5px;
+    will-change: transform;
+  }
+
+  .chute {
+    width: 60px; height: 50px;
+    background: #2f3542;
+    border-radius: 10px 10px 0 0;
+    position: absolute; bottom: 0; left: 50%;
+    transform: translateX(-50%);
+  }
+
+  /* The dispensed capsule & result */
+  .dispensed {
+    width: 45px; height: 45px;
+    background: linear-gradient(135deg, #1e90ff 50%, #fff 50%);
+    border-radius: 50%;
+    border: 2px solid #333;
+    position: absolute; bottom: 5px; left: 50%;
+    margin-left: -22.5px;
+    z-index: 4;
+    opacity: 0;
+    will-change: transform, opacity;
+  }
+
+  .result-reveal {
+    position: absolute; bottom: -80px;
+    background: #fff; border: 3px solid #333;
+    padding: 10px 20px; border-radius: 25px;
+    font-weight: bold; font-size: 2rem;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    opacity: 0;
+    white-space: nowrap;
+    max-width: 400px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transform: scale(0.5);
+    z-index: 5;
+    will-change: transform, opacity;
+  }
+
+  button {
+    margin-top: 100px; padding: 12px 30px;
+    font-size: 1.1rem; font-weight: bold;
+    background: #2ed573; color: white; border: none;
+    border-radius: 25px; cursor: pointer;
+    box-shadow: 0 5px 0 #20bf6b; transition: 0.1s;
+  }
+  button:active { transform: translateY(5px); box-shadow: 0 0 0 #20bf6b; }
+  button:disabled { background: #ccc; box-shadow: 0 5px 0 #999; cursor: not-allowed; }
+
+  #upload-btn {
+    margin-top: 20px; background: #0984e3; box-shadow: 0 5px 0 #0770c9;
+  }
+  #upload-btn:active { box-shadow: 0 0 0 #0770c9; }
+
+  #reset-btn {
+    margin-top: 20px; background: #e17055; box-shadow: 0 5px 0 #d63031;
+  }
+  #reset-btn:active { box-shadow: 0 0 0 #d63031; }
+
+  #file-input {
+    display: none;
+  }
+
+  /* =========================================
+     CSS ANIMATIONS (The Physics)
+     ========================================= */
+
+  /* 1. Handle Turn: Pull back slightly (resistance), spin fast, overshoot, and snap */
+  @keyframes turnHandle {
+    0%   { transform: rotate(0deg); }
+    15%  { transform: rotate(-20deg); animation-timing-function: ease-in; } /* Resistance */
+    70%  { transform: rotate(380deg); animation-timing-function: ease-out; } /* Overshoot */
+    100% { transform: rotate(360deg); } /* Settle */
+  }
+
+  /* 2. Shake: Chaotic, small vibrations */
+  @keyframes shakeCapsules {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    20% { transform: translate(-3px, 2px) rotate(8deg); }
+    40% { transform: translate(3px, -2px) rotate(-8deg); }
+    60% { transform: translate(-2px, -3px) rotate(5deg); }
+    80% { transform: translate(2px, 3px) rotate(-5deg); }
+  }
+
+  /* 3. Drop & Bounce: Gravity (ease-in) falling, momentum (ease-out) bouncing */
+  @keyframes dropAndBounce {
+    0% { 
+      transform: translateY(-120px) rotate(0deg); opacity: 0; 
+      animation-timing-function: cubic-bezier(0.32, 0, 0.67, 0); /* Gravity */
+    }
+    50% { /* 0.4s mark - hits the bottom */
+      transform: translateY(0px) rotate(90deg); opacity: 1; 
+      animation-timing-function: cubic-bezier(0.33, 1, 0.68, 1); /* Bounce up */
+    }
+    70% { /* Apex of first bounce */
+      transform: translateY(-30px) rotate(135deg); 
+      animation-timing-function: cubic-bezier(0.32, 0, 0.67, 0); /* Gravity */
+    }
+    85% { /* Hits bottom again */
+      transform: translateY(0px) rotate(180deg); 
+      animation-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
+    }
+    95% { /* Micro bounce */
+      transform: translateY(-10px) rotate(200deg); 
+      animation-timing-function: cubic-bezier(0.32, 0, 0.67, 0);
+    }
+    100% { transform: translateY(0px) rotate(210deg); opacity: 1; }
+  }
+
+  /* 4. Result Reveal: Pop out with an elastic overshoot */
+  @keyframes popReveal {
+    0% { transform: scale(0.5); opacity: 0; }
+    70% { transform: scale(1.1); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+</style>
+</head>
+<body>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js"></script>
+
+  <div class="machine">
+    <div class="dome" id="dome">
+      <!-- Decorative capsules scattered using inline styles -->
+      <div class="capsule" style="--color: #ffa502; top: 140px; left: 30px; transform: rotate(20deg);"></div>
+      <div class="capsule" style="--color: #1e90ff; top: 120px; left: 80px; transform: rotate(-45deg);"></div>
+      <div class="capsule" style="--color: #ff4757; top: 145px; left: 130px; transform: rotate(70deg);"></div>
+      <div class="capsule" style="--color: #2ed573; top: 100px; left: 120px; transform: rotate(10deg);"></div>
+      <div class="capsule" style="--color: #9c88ff; top: 110px; left: 40px; transform: rotate(-15deg);"></div>
+    </div>
+    
+    <div class="base">
+      <div class="handle-container">
+        <div class="handle" id="handle"></div>
+      </div>
+      <div class="chute"></div>
+    </div>
+    
+    <div class="dispensed" id="dispensed"></div>
+    <div class="result-reveal" id="result">✨ Winner! ✨</div>
+  </div>
+
+  <button id="spin-btn">Pick Random Name</button>
+  <button id="upload-btn">Upload Names List</button>
+  <button id="reset-btn">Reset Names</button>
+  <input type="file" id="file-input" accept=".txt,.json,.csv,.xlsx">
+
+<script>
+  let names = ["Alice", "Bob", "Charlie", "Diana", "Ethan"];
+  let availableNames = [...names];
+  const spinBtn = document.getElementById('spin-btn');
+  const uploadBtn = document.getElementById('upload-btn');
+  const resetBtn = document.getElementById('reset-btn');
+  const fileInput = document.getElementById('file-input');
+  const handle = document.getElementById('handle');
+  const capsules = document.querySelectorAll('.capsule');
+  const dispensed = document.getElementById('dispensed');
+  const result = document.getElementById('result');
+
+  // Utility to create precise delays
+  const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+  // Handle upload button click
+  uploadBtn.addEventListener('click', () => {
+    fileInput.click();
+  });
+
+  // Handle reset button click
+  resetBtn.addEventListener('click', () => {
+    availableNames = [...names];
+    result.innerText = '';
+    alert('Names have been reset! You can start picking again.');
+  });
+
+  // Handle keyboard input
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && !spinBtn.disabled) {
+      e.preventDefault(); // Prevent page scrolling
+      spinBtn.click();
+    }
+  });
+
+  // Handle file selection
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Handle Excel files
+    if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const data = event.target.result;
+          const workbook = XLSX.read(data, { type: 'binary' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const csv = XLSX.utils.sheet_to_csv(firstSheet);
+          
+          let uploadedNames = csv
+            .split(/[\n,]+/)
+            .map(name => name.trim())
+            .filter(name => name.length > 0 && name.toLowerCase() !== 'name');
+
+          // Remove duplicates
+          uploadedNames = [...new Set(uploadedNames)];
+
+          if (uploadedNames.length > 0) {
+            names = uploadedNames;
+            availableNames = [...names];
+            result.innerText = ''; // Clear previous result
+            alert(`Successfully loaded ${names.length} unique names!`);
+          } else {
+            alert('No names found in the file.');
+          }
+        } catch (error) {
+          alert('Error reading Excel file: ' + error.message);
+        }
+      };
+      reader.readAsBinaryString(file);
+    } else {
+      // Handle text, JSON, and CSV files
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const content = event.target.result;
+          let uploadedNames = [];
+
+          // Try to parse as JSON first
+          try {
+            const json = JSON.parse(content);
+            uploadedNames = Array.isArray(json) ? json : [json];
+          } catch {
+            // Fall back to CSV or plain text (newline-separated)
+            uploadedNames = content
+              .split(/[\n,]+/)
+              .map(name => name.trim())
+              .filter(name => name.length > 0);
+          }
+
+          // Remove duplicates
+          uploadedNames = [...new Set(uploadedNames)];
+
+          if (uploadedNames.length > 0) {
+            names = uploadedNames;
+            availableNames = [...names];
+            result.innerText = ''; // Clear previous result
+            alert(`Successfully loaded ${names.length} unique names!`);
+          } else {
+            alert('No names found in the file.');
+          }
+        } catch (error) {
+          alert('Error reading file: ' + error.message);
+        }
+      };
+      reader.readAsText(file);
+    }
+    
+    // Reset file input so the same file can be re-uploaded
+    fileInput.value = '';
+  });
+
+  spinBtn.addEventListener('click', async () => {
+    // Check if all names have been picked
+    if (availableNames.length === 0) {
+      alert('All names have been picked! Click "Reset Names" to start over.');
+      return;
+    }
+
+    // Disable button to prevent spam
+    spinBtn.disabled = true;
+
+    // --- RESET PREVIOUS ANIMATIONS ---
+    dispensed.style.animation = 'none';
+    result.style.animation = 'none';
+    handle.style.animation = 'none';
+    capsules.forEach(cap => cap.style.animation = 'none');
+    
+    // Force a reflow so the browser registers the animation resets
+    void dispensed.offsetWidth; 
+
+    // Pick a winner randomly from available names
+    const randomIndex = Math.floor(Math.random() * availableNames.length);
+    const winner = availableNames[randomIndex];
+    availableNames.splice(randomIndex, 1); // Remove picked name from available
+    
+    result.innerText = `✨ ${winner} ✨`;
+
+    // --- STAGE 1: Handle Turn (0.6s) ---
+    // The CSS includes a slight backward pull to simulate physical resistance
+    handle.style.animation = 'turnHandle 0.6s linear forwards';
+    await delay(600); 
+
+    // --- STAGE 2: Capsule Shake (0.5s) ---
+    // Stagger the shake slightly per capsule to make it look organic, not rigid
+    capsules.forEach((cap, i) => {
+      const stagger = i * 0.05;
+      cap.style.animation = `shakeCapsules 0.5s ${stagger}s ease-in-out forwards`;
+    });
+    await delay(500); 
+
+    // --- STAGE 3: Capsule Drop & Bounce (0.8s total) ---
+    // The keyframes make it hit the bottom exactly at 0.4s, then spend 0.4s bouncing
+    dispensed.style.animation = 'dropAndBounce 0.8s forwards';
+    await delay(800); 
+
+    // --- STAGE 4: Result Reveal (0.4s) ---
+    // Uses a custom cubic-bezier in CSS to pop up and settle
+    result.style.animation = 'popReveal 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
+    await delay(400);
+
+    // Re-enable button
+    spinBtn.disabled = false;
+  });
+</script>
+
+</body>
+</html>
